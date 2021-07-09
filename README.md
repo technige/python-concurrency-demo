@@ -5,10 +5,10 @@ Python 3.8 or above is required to run the code.
 
 To run the threading demo:
 ```shell script
-$ ptyhon -m demo.threads
+$ python -m demo.threads
 ```
 
 To run the multiprocessing demo:
 ```shell script
-$ ptyhon -m demo.processes
+$ python -m demo.processes
 ```
