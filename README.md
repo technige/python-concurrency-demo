@@ -12,3 +12,8 @@ To run the multiprocessing demo:
 ```shell script
 $ python -m demo.processes
 ```
+
+To run the coroutines demo:
+```shell script
+$ python -m demo.coroutines
+```
