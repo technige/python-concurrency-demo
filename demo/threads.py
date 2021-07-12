@@ -1,16 +1,20 @@
+#!/usr/bin/env python3.8
+# -*- coding: utf-8 -*-
+
+
 from logging import basicConfig, INFO, info
 from queue import Queue, Empty
-from random import random
 from threading import Lock, Thread
-from time import monotonic
 
-from .common import BaseService, BaseWorker, Task
+from .common import BaseService, BaseWorker, CPUBoundTask
 
 
 class Service(BaseService):
+    """ A service that operates using thread-based concurrency.
+    """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, workers):
+        super().__init__(workers)
         self.run_lock = Lock()
         self.todo = Queue()
 
@@ -23,8 +27,9 @@ class Service(BaseService):
     def is_running(self):
         return self.run_lock.locked()
 
-    def add_task(self, task):
-        self.todo.put(task)
+    def add_tasks(self, tasks):
+        for task in tasks:
+            self.todo.put(task)
 
     def get_task(self):
         try:
@@ -39,9 +44,8 @@ class Worker(BaseWorker):
         super().__init__(number)
         self.thread = None
 
-    def start(self, service):
+    def start(self):
         info(f"Starting {self}")
-        super().start(service)
         self.thread = Thread(target=self.work)
         self.thread.start()
 
@@ -51,21 +55,9 @@ class Worker(BaseWorker):
         self.thread = None
 
 
-def main():
-    basicConfig(level=INFO)
-    service = Service()
-    for n in range(100):
-        size = 0.5 + random()
-        service.add_task(Task(n, size))
-    for n in range(4):
-        service.add_worker(Worker(n))
-
-    t0 = monotonic()
-    service.start()
-    while monotonic() - t0 < 10.0:
-        pass
-    service.stop()
-
-
 if __name__ == "__main__":
-    main()
+    basicConfig(level=INFO)
+    # Create a service with four workers and run a list of
+    # 100 cpu-bound tasks with a time limit of 10s.
+    (Service(Worker(n) for n in range(4))
+     .run(CPUBoundTask.create_random_list(100, seed=0), timeout=10.0))
