@@ -2,71 +2,77 @@
 # -*- coding: utf-8 -*-
 
 
-from asyncio import Lock, Queue, QueueEmpty, create_task, run, wait_for, sleep
+from asyncio import Lock, Queue, TimeoutError, create_task, run, sleep, wait_for
 from logging import basicConfig, INFO, info
 
-from .common import BaseService, BaseWorker, CPUBoundJob
+from .jobs import CPUBoundJob
 
 
-class Service(BaseService):
+class Service:
     """ A service that operates using coroutine-based concurrency.
     """
 
-    def __init__(self, workers, jobs):
+    def __init__(self, n_workers):
         self.run_lock = Lock()
-        self.todo = Queue()
-        super().__init__(workers, jobs)
+        self.jobs = Queue()
+        self.workers = [Worker(self.run_lock, self.jobs)
+                        for _ in range(n_workers)]
+
+    def add_jobs(self, jobs):
+        for job in jobs:
+            self.jobs.put_nowait(job)
 
     async def start(self):
         """ Start the service and all associated workers.
         """
-        info("Service starting")
+        info(f"Starting {self}")
         await self.run_lock.acquire()
         for worker in self.workers:
+            info(f"Starting {worker}")
             worker.start()
 
     async def stop(self):
         """ Stop the service and all associated workers.
         """
-        info("Service stopping")
+        info(f"Stopping {self}")
         self.run_lock.release()
         for worker in self.workers:
-            await worker.stop()
-
-    def is_running(self):
-        return self.run_lock.locked()
-
-    def add_jobs(self, jobs):
-        for job in jobs:
-            self.todo.put_nowait(job)
-
-    async def get_job(self, timeout):
-        try:
-            return await wait_for(self.todo.get(), timeout=timeout)
-        except QueueEmpty:
-            raise IndexError("No more jobs")
+            info(f"Stopping {worker}")
+            await worker.join()
 
 
-class Worker(BaseWorker):
+class Worker:
     """ A worker that uses coroutines.
+
+    Unlike with threads and processes, this doesn't extend a base class
+    but instead embeds a Task object. This is because the Python manual
+    recommends using the create_task function to create Tasks.
     """
 
-    def __init__(self, number):
-        super().__init__(number)
+    def __init__(self, run_lock, jobs):
+        self.run_lock = run_lock
+        self.jobs = jobs
         self.task = None
+
+    def __repr__(self):
+        if self.task:
+            return f"<Worker({self.task.get_name()})>"
+        else:
+            return super().__repr__()
 
     async def work(self):
         """ Continuously process jobs from the service workload until
         the service stops running.
-
-        This method is used as a callback after the worker has been
-        started.
         """
         info(f"{self} is starting work")
-        while self.service.is_running():
+        while self.run_lock.locked():
             try:
-                job = await self.service.get_job(timeout=1.0)
-            except IndexError:
+                job = await wait_for(self.jobs.get(), timeout=1.0)
+            except TimeoutError:
+                # An asyncio.Queue does not accept a timeout argument
+                # for its get() method. So this is instead wrapped in
+                # a wait_for() call, which will raise an
+                # asyncio.TimeoutError exception if it times out.
                 info(f"{self} has no work to do")
             else:
                 info(f"{self} is processing {job}")
@@ -75,11 +81,13 @@ class Worker(BaseWorker):
         info(f"{self} has finished work")
 
     def start(self):
-        info(f"Starting {self}")
+        """ Start the worker by scheduling a task.
+        """
         self.task = create_task(self.work())
 
-    async def stop(self):
-        info(f"Stopping {self}")
+    async def join(self):
+        """ Wait for the task to complete.
+        """
         await self.task
 
 
@@ -87,8 +95,8 @@ async def main():
     """ Create a service with four workers and run a list of
     100 cpu-bound jobs with a time limit of 10s.
     """
-    service = Service([Worker(n) for n in range(4)],
-                      CPUBoundJob.create_random_list(100, seed=0))
+    service = Service(n_workers=4)
+    service.add_jobs(CPUBoundJob.create_random_list(20, seed=0))
     await service.start()
     await sleep(10.0)
     await service.stop()

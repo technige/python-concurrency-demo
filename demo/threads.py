@@ -7,63 +7,58 @@ from queue import Queue, Empty
 from threading import Lock, Thread
 from time import sleep
 
-from .common import BaseService, BaseWorker, CPUBoundJob
+from .jobs import CPUBoundJob
 
 
-class Service(BaseService):
+class Service:
     """ A service that operates using thread-based concurrency.
     """
 
-    def __init__(self, workers, jobs):
+    def __init__(self, n_workers):
         self.run_lock = Lock()
-        self.todo = Queue()
-        super().__init__(workers, jobs)
-
-    def start(self):
-        info("Service starting")
-        self.run_lock.acquire()
-        for worker in self.workers:
-            worker.start()
-
-    def stop(self):
-        info("Service stopping")
-        self.run_lock.release()
-        for worker in self.workers:
-            worker.stop()
-
-    def is_running(self):
-        return self.run_lock.locked()
+        self.jobs = Queue()
+        self.workers = [Worker(self.run_lock, self.jobs)
+                        for _ in range(n_workers)]
 
     def add_jobs(self, jobs):
         for job in jobs:
-            self.todo.put_nowait(job)
+            self.jobs.put_nowait(job)
 
-    def get_job(self, timeout):
-        try:
-            return self.todo.get(timeout=timeout)
-        except Empty:
-            raise IndexError("No more jobs")
+    def start(self):
+        info(f"Starting {self}")
+        self.run_lock.acquire()
+        for worker in self.workers:
+            info(f"Starting {worker}")
+            worker.start()
+
+    def stop(self):
+        info(f"Stopping {self}")
+        self.run_lock.release()
+        for worker in self.workers:
+            info(f"Stopping {worker}")
+            worker.join()
 
 
-class Worker(BaseWorker):
-    """ A worker that maintains its own thread.
+class Worker(Thread):
+    """ A worker thread.
     """
 
-    def __init__(self, number):
-        super().__init__(number)
-        self.thread = None
+    def __init__(self, run_lock, jobs):
+        self.run_lock = run_lock
+        self.jobs = jobs
+        super().__init__()
 
-    def work(self):
+    def run(self):
         """ Continuously process jobs from the service workload until
         the service stops running.
-
-        This method is used as a target by the worker thread.
         """
         info(f"{self} is starting work")
-        while self.service.is_running():
+        while self.run_lock.locked():
             try:
-                job = self.service.get_job(timeout=1.0)
-            except IndexError:
+                job = self.jobs.get(timeout=1.0)
+            except Empty:
+                # A queue.Queue will raise a queue.Empty exception if
+                # the get() call times out.
                 info(f"{self} has no work to do")
             else:
                 info(f"{self} is processing {job}")
@@ -71,22 +66,13 @@ class Worker(BaseWorker):
                 info(f"{self} has completed {job}")
         info(f"{self} has finished work")
 
-    def start(self):
-        info(f"Starting {self}")
-        self.thread = Thread(target=self.work)
-        self.thread.start()
-
-    def stop(self):
-        info(f"Stopping {self}")
-        self.thread.join()
-
 
 def main():
     """ Create a service with four workers and run a list of
     100 cpu-bound jobs with a time limit of 10s.
     """
-    service = Service([Worker(n) for n in range(4)],
-                      CPUBoundJob.create_random_list(20, seed=0))
+    service = Service(n_workers=4)
+    service.add_jobs(CPUBoundJob.create_random_list(20, seed=0))
     service.start()
     sleep(10.0)
     service.stop()
