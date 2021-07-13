@@ -58,7 +58,7 @@ other synchronization primitives, such as _Conditions_, _Events_ and _Semaphores
 Again, these are not compatible across concurrency methods.
 
 
-# Queues
+## Queues
 
 Each Python concurrency module also has a different implementation available for managing
 a queue: `queue.Queue` (for threading), `multiprocessing.Queue` and `asyncio.Queue`.
