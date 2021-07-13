@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
+from argparse import ArgumentParser
 from logging import basicConfig, INFO, info
 from queue import Queue, Empty
 from threading import Lock, Thread
@@ -68,13 +69,20 @@ class Worker(Thread):
 
 
 def main():
-    """ Create a service with four workers and run a list of
-    100 cpu-bound jobs with a time limit of 10s.
+    """ Create and run a demo service to demonstrate concurrency using
+    threads.
     """
-    service = Service(n_workers=4)
-    service.add_jobs(CPUBoundJob.create_random_list(20, seed=0))
+    parser = ArgumentParser(description=main.__doc__)
+    parser.add_argument("--jobs", type=int, default=20, help="number of jobs")
+    parser.add_argument("--seed", type=int, default=None, help="random seed")
+    parser.add_argument("--time", type=float, default=10.0, help="time to run (seconds)")
+    parser.add_argument("--workers", type=int, default=4, help="number of workers")
+    args = parser.parse_args()
+    #
+    service = Service(n_workers=args.workers)
+    service.add_jobs(CPUBoundJob.create_random_list(args.jobs, seed=args.seed))
     service.start()
-    sleep(10.0)
+    sleep(args.time)
     service.stop()
 
 

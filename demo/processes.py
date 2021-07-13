@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 
+from argparse import ArgumentParser
 from logging import basicConfig, INFO, info
-from multiprocessing import Lock, Process, Queue
+from multiprocessing import Lock, Process, Queue, get_all_start_methods, set_start_method
 from queue import Empty
 from time import sleep
 
@@ -86,13 +87,27 @@ class Worker(Process):
 
 
 def main():
-    """ Create a service with four workers and run a list of
-    100 cpu-bound jobs with a time limit of 10s.
+    """ Create and run a demo service to demonstrate concurrency using
+    processes.
     """
-    service = Service(n_workers=4)
-    service.add_jobs(CPUBoundJob.create_random_list(20, seed=0))
+    parser = ArgumentParser(description=main.__doc__)
+    parser.add_argument("--jobs", type=int, default=20, help="number of jobs")
+    parser.add_argument("--method", choices=get_all_start_methods(), default=None,
+                        help="method to start child processes")
+    parser.add_argument("--seed", type=int, default=None, help="random seed")
+    parser.add_argument("--time", type=float, default=10.0, help="time to run (seconds)")
+    parser.add_argument("--workers", type=int, default=4, help="number of workers")
+    args = parser.parse_args()
+    #
+    # Child processes can be created using one of several available
+    # methods, depending on the platform. This sets that method or,
+    # if set to None, uses the default for the OS.
+    set_start_method(args.method)
+    #
+    service = Service(n_workers=args.workers)
+    service.add_jobs(CPUBoundJob.create_random_list(args.jobs, seed=args.seed))
     service.start()
-    sleep(10.0)
+    sleep(args.time)
     service.stop()
 
 
