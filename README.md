@@ -73,6 +73,33 @@ To run the threading demo, use:
 $ python -m demo.threads
 ```
 
+Thread-based concurrency centres mainly around the Python `threading` module.
+This is generally the simplest form of concurrency to work with, as it is both
+very mature and can allow objects to be shared easily. The primary trade-off is
+that - due to the GIL (mentioned above) - only one thread can be executing code at
+any given point in time.
+
+The diagram below shows an abstract view of multiple threads taking turns to
+execute code. Each vertical bar denotes a switch wherein one thread releases the
+GIL and another acquires it. 
+
+![Abstract depiction of threads operating alongside the GIL](art/gil-threads.png)
+
+The simplest way to implement thread-based concurrency in Python is to extend the
+`threading.Thread` class, overriding the `run()` method. This is done in this demo,
+by creating the `Worker` class as a subclass of `Thread`.
+
+Threads can be started with the `start()` method and the flow of execution merged
+back into the main thread with the `join()` method.
+
+Note that some standard library components outside of the `threading` module
+are marked as _thread-safe_. For example, `collections.deque`, `queue.Queue` and
+the `logging` module are all safe to use in a multi-threaded application.
+
+For more information on thread-based concurrency, read the Python documentation on the 
+[threading module](https://docs.python.org/3/library/threading.html).
+
+
 ## Process-based concurrency
 
 To run the multiprocessing demo, use:
