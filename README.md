@@ -107,10 +107,34 @@ To run the multiprocessing demo, use:
 $ python -m demo.processes
 ```
 
-The process-based concurrency demo accepts a further command line option `--method`
-to set the start method for child processes. The value can be either `fork`, 
-`spawn` or `forkserver` and the default differs by operating system. For more
-information, look at the [Python documentation](https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods).
+Process-based concurrency can _sometimes_ be more performant than thread-based
+concurrency, but this depends heavily on the type of workload. It is
+however typically more fraught with issues of complexity. Internally to Python,
+the mechanisms used to spawn processes vary by underlying operating system,
+which can affect the portability of applications.
+
+To illustrate this, the process-based demo here accepts a further command line
+option, `--method`, which can be used to explicitly set the start method for 
+child processes. The value can be either `fork`, `spawn` or `forkserver` and
+the default differs by operating system. More information on the differences
+between these start methods can be found in the 
+[Python documentation](https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods).
+ 
+Multi-processing generally avoids GIL issues, as each process maintains its own GIL:
+
+![Abstract depiction of processes operating alongside the GIL](art/gil-processes.png)
+
+The trade-off with this approach, however, is the relative complexity of sharing
+objects between processes. This typically relies on the built-in `multiprocessing.Pipe`
+class which allows two-way socket-style communication between processes, which
+of course requires all objects to be serializable as byte streams.
+
+The `multiprocessing.Queue` class (as used in this demo) is built on top of
+a `Pipe`, and as such requires all queued items to be
+[picklable](https://docs.python.org/3/library/pickle.html).
+
+For more information on process-based concurrency, read the Python documentation on the 
+[multiprocessing module](https://docs.python.org/3/library/multiprocessing.html).
 
 
 ## Coroutine-based concurrency
