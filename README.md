@@ -74,10 +74,11 @@ $ python -m demo.threads
 ```
 
 Thread-based concurrency centres mainly around the Python `threading` module.
-This is generally the simplest form of concurrency to work with, as it is both
-very mature and can allow objects to be shared easily. The primary trade-off is
-that - due to the GIL (mentioned above) - only one thread can be executing code at
-any given point in time.
+This is generally the simplest form of concurrency to work with as it is very
+mature, it has broad support across the standard library and many third-party
+libraries, and sharing objects across threads is straightforward (unlike with 
+`multiprocessing`). The primary trade-off is that due to the GIL (mentioned above)
+only one thread can be executing code at any given point in time.
 
 The diagram below shows an abstract view of multiple threads taking turns to
 execute code. Each vertical bar denotes a switch wherein one thread releases the
@@ -143,3 +144,30 @@ To run the coroutines demo, use:
 ```shell script
 $ python -m demo.coroutines
 ```
+
+Coroutine-based concurrency is perhaps the most esoteric of these three options,
+being less familiar to developers in general than the thread-based and process-based
+approaches. There exist a number of implementations of coroutine-based concurrency
+for Python, including third-party [greenlets](https://greenlet.readthedocs.io/en/latest/#),
+simple built-in [generators](https://docs.python.org/3/glossary.html#term-generator),
+and the new [`asyncio`](https://docs.python.org/3/library/asyncio.html) module 
+introduced in Python 3. This demo uses the latter of these.
+
+The `asyncio` module introduces not only a set of classes and functions for working
+with coroutine-based concurrency, but also brand new Python language syntax. Specifically,
+the keywords `async` and `await` which are respectively used to define asynchronous
+operations and to block until those operations are complete. A function defined with
+`async def` is an example of an _awaitable_ object, and examples of this can be seen
+within the coroutines demo module here.
+
+Since its introduction in Python 3.0, the `asyncio` capabilities have matured enormously,
+and it is now functionally very complete. This makes it a good option for new projects.
+
+It is however worth being aware that usage of `async`/`await` is typically viral. This
+means that if it is used in one part of a code base, it will likely be necessary in other
+parts too, in order to support the asynchronous execution. In other words: a code base
+is usually designed to operate asynchronously, or not. Mixing the two approaches is
+hard, and sometimes impossible.
+
+For more information on coroutine-based concurrency, read the Python documentation on the 
+[asyncio module](https://docs.python.org/3/library/asyncio.html).
