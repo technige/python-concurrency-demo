@@ -4,8 +4,9 @@
 
 from argparse import ArgumentParser
 from logging import basicConfig, INFO, info
+
 from queue import Queue, Empty
-from threading import Lock, Thread
+from threading import Lock, Thread, current_thread
 from time import sleep
 
 from .jobs import CPUBoundJob
@@ -15,57 +16,60 @@ class Service:
     """ A service that operates using thread-based concurrency.
     """
 
-    def __init__(self, n_workers):
+    def __init__(self):
         self.run_lock = Lock()
         self.jobs = Queue()
-        self.workers = [Worker(self.run_lock, self.jobs)
-                        for _ in range(n_workers)]
+
+    def __str__(self):
+        return f"Service-{id(self)}"
 
     def add_jobs(self, jobs):
+        """ Add jobs to the workload queue.
+        """
         for job in jobs:
             self.jobs.put_nowait(job)
 
-    def start(self):
+    def run(self, n_workers, timeout):
+        """ Run the service with the given number of workers for the
+        given number of seconds.
+        """
+        workers = []
+
         info(f"Starting {self}")
         self.run_lock.acquire()
-        for worker in self.workers:
-            info(f"Starting {worker}")
+        for _ in range(n_workers):
+            worker = Thread(target=self.work)
             worker.start()
+            workers.append(worker)
 
-    def stop(self):
+        sleep(timeout)
+
         info(f"Stopping {self}")
         self.run_lock.release()
-        for worker in self.workers:
-            info(f"Stopping {worker}")
+        for worker in workers:
             worker.join()
 
+    def work(self):
+        """ Worker method to continuously process jobs from the
+        workload until the service stops running.
 
-class Worker(Thread):
-    """ A worker thread.
-    """
-
-    def __init__(self, run_lock, jobs):
-        self.run_lock = run_lock
-        self.jobs = jobs
-        super().__init__()
-
-    def run(self):
-        """ Continuously process jobs from the service workload until
-        the service stops running.
+        This method is executed within the Thread context, and will
+        therefore run multiple times, concurrently.
         """
-        info(f"{self} is starting work")
+        me = current_thread().name
+        info(f"{me} is starting work")
         while self.run_lock.locked():
             try:
                 job = self.jobs.get(timeout=1.0)
             except Empty:
                 # A queue.Queue will raise a queue.Empty exception if
                 # the get() call times out.
-                info(f"{self} has no work to do")
+                info(f"{me} has no work to do")
             else:
-                info(f"{self} is processing {job}")
+                info(f"{me} is processing {job}")
                 job.process()
-                info(f"{self} has completed {job}")
-        info(f"{self} has finished work")
+                info(f"{me} has completed {job}")
+        info(f"{me} has finished work")
 
 
 def main():
@@ -79,11 +83,9 @@ def main():
     parser.add_argument("--workers", type=int, default=4, help="number of workers")
     args = parser.parse_args()
     #
-    service = Service(n_workers=args.workers)
+    service = Service()
     service.add_jobs(CPUBoundJob.create_random_list(args.jobs, seed=args.seed))
-    service.start()
-    sleep(args.time)
-    service.stop()
+    service.run(n_workers=args.workers, timeout=args.time)
 
 
 if __name__ == "__main__":
