@@ -85,9 +85,9 @@ GIL and another acquires it.
 
 ![Abstract depiction of threads operating alongside the GIL](art/gil-threads.png)
 
-The simplest way to implement thread-based concurrency in Python is to extend the
-`threading.Thread` class, overriding the `run()` method. This is done in this demo,
-by creating the `Worker` class as a subclass of `Thread`.
+The simplest way to implement thread-based concurrency in Python is to either use the 
+the `threading.Thread` class directly, or to extend it and override the `run()` 
+method. This demo uses the base `Thread` class, passing it a target function.
 
 Threads can be started with the `start()` method and the flow of execution merged
 back into the main thread with the `join()` method.
